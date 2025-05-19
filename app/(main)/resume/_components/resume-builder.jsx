@@ -23,8 +23,8 @@ import useFetch from "@/hooks/use-fetch";
 import { useUser } from "@clerk/nextjs";
 import { entriesToMarkdown } from "@/app/lib/helper";
 import { resumeSchema } from "@/app/lib/schema";
-import { marked } from "marked";
-import { jsPDF } from "jspdf";
+import html2pdf from "html2pdf.js/dist/html2pdf.min.js";
+
 export default function ResumeBuilder({ initialContent }) {
   const [activeTab, setActiveTab] = useState("edit");
   const [previewContent, setPreviewContent] = useState(initialContent);
@@ -109,51 +109,28 @@ export default function ResumeBuilder({ initialContent }) {
       .filter(Boolean)
       .join("\n\n");
   };
+
   const [isGenerating, setIsGenerating] = useState(false);
+
   const generatePDF = async () => {
     setIsGenerating(true);
     try {
-      const htmlContent = marked.parse(previewContent || "");
+      const element = document.getElementById("resume-pdf");
+      const opt = {
+        margin: [15, 15],
+        filename: "resume.pdf",
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      };
 
-      // Create a sandboxed offscreen container
-      const container = document.createElement("div");
-      container.innerHTML = htmlContent;
-      container.style.position = "absolute";
-      container.style.left = "-9999px";
-      container.style.top = "0";
-      container.style.width = "800px";
-      container.style.padding = "32px";
-      container.style.fontFamily = "Arial, sans-serif";
-      container.style.backgroundColor = "#ffffff";
-      container.style.color = "#000000";
-      document.body.appendChild(container);
-
-      const pdf = new jsPDF({
-        unit: "pt",
-        format: "a4",
-      });
-
-      await pdf.html(container, {
-        callback: () => {
-          pdf.save("resume.pdf");
-          document.body.removeChild(container);
-          setIsGenerating(false);
-        },
-        x: 20,
-        y: 20,
-        html2canvas: {
-          useCORS: true,
-          scale: 2,
-          backgroundColor: "#ffffff",
-        },
-      });
+      await html2pdf().set(opt).from(element).save();
     } catch (error) {
       console.error("PDF generation error:", error);
-      toast.error("Failed to generate PDF");
+    } finally {
       setIsGenerating(false);
     }
   };
-
 
   const onSubmit = async (data) => {
     try {
@@ -424,8 +401,17 @@ export default function ResumeBuilder({ initialContent }) {
               preview={resumeMode}
             />
           </div>
-
-
+          <div className="hidden">
+            <div id="resume-pdf">
+              <MDEditor.Markdown
+                source={previewContent}
+                style={{
+                  background: "white",
+                  color: "black",
+                }}
+              />
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
