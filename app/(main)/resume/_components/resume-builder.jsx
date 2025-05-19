@@ -26,7 +26,6 @@ import { resumeSchema } from "@/app/lib/schema";
 import html2canvas from 'html2canvas-pro';
 import jsPDF from "jspdf";
 import './resume.css';
-import html2pdf from 'html2pdf.js';
 
 export default function ResumeBuilder({ initialContent }) {
   const [activeTab, setActiveTab] = useState("edit");
