@@ -23,7 +23,9 @@ import useFetch from "@/hooks/use-fetch";
 import { useUser } from "@clerk/nextjs";
 import { entriesToMarkdown } from "@/app/lib/helper";
 import { resumeSchema } from "@/app/lib/schema";
-import html2pdf from "html2pdf.js/dist/html2pdf.min.js";
+import html2canvas from 'html2canvas-pro';
+import jsPDF from "jspdf";
+import './resume.css';
 
 export default function ResumeBuilder({ initialContent }) {
   const [activeTab, setActiveTab] = useState("edit");
@@ -91,17 +93,30 @@ export default function ResumeBuilder({ initialContent }) {
     if (contactInfo.twitter) parts.push(`🐦 [Twitter](${contactInfo.twitter})`);
 
     return parts.length > 0
-      ? `## <div align="center">${user.fullName}</div>
-        \n\n<div align="center">\n\n${parts.join(" | ")}\n\n</div>`
-      : "";
+      ? `# ${user.fullName}
+
+${parts.join("  \n")}`
+      : `# ${user.fullName}`;
+
   };
 
   const getCombinedContent = () => {
+    if (!user || !formValues) return "";
+
     const { summary, skills, experience, education, projects } = formValues;
+
+    const formattedSkills = skills
+      ? `## Skills\n\n${skills
+        .split(/[,;\n]+/)
+        .map(skill => `- ${skill.trim()}`)
+        .filter(Boolean)
+        .join("\n")}`
+      : null;
+
     return [
       getContactMarkdown(),
-      summary && `## Professional Summary\n\n${summary}`,
-      skills && `## Skills\n\n${skills}`,
+      summary && `## Professional Summary\n\n${summary.trim()}`,
+      formattedSkills,
       entriesToMarkdown(experience, "Work Experience"),
       entriesToMarkdown(education, "Education"),
       entriesToMarkdown(projects, "Projects"),
@@ -115,22 +130,48 @@ export default function ResumeBuilder({ initialContent }) {
   const generatePDF = async () => {
     setIsGenerating(true);
     try {
-      const element = document.getElementById("resume-pdf");
-      const opt = {
-        margin: [15, 15],
-        filename: "resume.pdf",
-        image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-      };
+      await new Promise(resolve => setTimeout(resolve, 100)); // ensure render
 
-      await html2pdf().set(opt).from(element).save();
+      const element = document.getElementById("resume-pdf");
+      if (!element) throw new Error("Resume element not found");
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+      });
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.98);
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      const imgWidth = pdfWidth;
+      const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight;
+
+      while (heightLeft > 0) {
+        position -= pdfHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      pdf.save("resume.pdf");
     } catch (error) {
       console.error("PDF generation error:", error);
     } finally {
       setIsGenerating(false);
     }
   };
+
+
 
   const onSubmit = async (data) => {
     try {
@@ -401,17 +442,28 @@ export default function ResumeBuilder({ initialContent }) {
               preview={resumeMode}
             />
           </div>
-          <div className="hidden">
-            <div id="resume-pdf">
+          <div style={{ position: "absolute", left: "-9999px", top: "0" }}>
+            <div
+              id="resume-pdf"
+              style={{
+                width: "794px", // approx A4 at 96dpi
+                padding: "40px",
+                fontFamily: "Segoe UI, sans-serif",
+                fontSize: "11pt",
+                lineHeight: "1.6",
+                color: "#222",
+                backgroundColor: "#fff",
+              }}
+            >
               <MDEditor.Markdown
                 source={previewContent}
-                style={{
-                  background: "white",
-                  color: "black",
-                }}
+                className="resume-markdown"
+                style={{ fontSize: "11pt" }}
               />
             </div>
           </div>
+
+
         </TabsContent>
       </Tabs>
     </div>
