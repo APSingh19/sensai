@@ -1,0 +1,18 @@
+.resume-markdown h1 {
+    font-size: 24px;
+    margin-bottom: 0.5em;
+}
+
+.resume-markdown h2 {
+    font-size: 18px;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+}
+
+.resume-markdown ul {
+    padding-left: 20px;
+}
+
+.resume-markdown p {
+    margin: 0.4em 0;
+}
